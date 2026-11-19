@@ -5,6 +5,7 @@ build/
 
 # ModDevGradle run directory (dev server and client worlds, logs, configs)
 run/
+run-client/
 
 # IDE files
 .idea/
@@ -27,3 +28,6 @@ Thumbs.db
 
 # Note: local-maven/ IS tracked on purpose. It contains a generated POM that the public
 # NeoForged mirrors are missing; see README "Building without maven.neoforged.net".
+
+# Ad-hoc build/test logs and extracted reference sources used while porting
+.scratch-*

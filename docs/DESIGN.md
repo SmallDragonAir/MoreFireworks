@@ -136,3 +136,22 @@ core  ──► FireworkNamer（纯 Java，返回 String 与 List<NameSegment>�
 3. **组件是字符串而不是二进制**：可读性换来了少量空间开销（每枚火箭约多 10–20% 字节）。
 4. **编辑界面**：第一阶段未实现图形化编辑器，参数通过命令与创造模式物品栏获得。
    数据层的所有接口都已就绪，GUI 只需要构造 `RocketSpec` 并写回组件。
+
+## 10. 移植到 1.21.1 / Down-porting to 1.21.1
+
+26.2 的工程保持在 `main` 分支，1.21.1 的移植在 `mc1.21.1` 分支上通过 git worktree 独立构建
+（`D:/Project/MoreFireworks-1.21.1`），因此两个 jar 永远不会互相覆盖。
+
+移植的原则是"只改 API 调用，不改算法"：`core`、`naming` 两个包除 `Component` 之外不接触
+Minecraft，所以 47 个单元测试在 1.21.1 上原样通过，819 位理论总数与命名结果逐字节一致。
+
+1.21.1 与 26.2 的具体差异（Tooltip、`InteractionResultHolder`、权限判定、`RecipeSerializer`
+由类改为接口、`assemble` 多出 `HolderLookup.Provider`、`Ingredient` 的旧版 JSON 结构、
+`registerItem` 没有 `UnaryOperator` 重载、物品染色从物品模型定义改为 `ItemColor`）已在
+[README §8](../README.md#8-what-changed-in-the-1211-port) 逐条列出。
+
+值得单独说明的一个设计决定是**客户端专属代码的隔离**：1.21.1 没有物品模型定义的 tint 机制，
+烟火之星的图标颜色只能由 `ItemColor` 提供。这个类放在 `client/MFClientSetup`，并用
+`@EventBusSubscriber(value = Dist.CLIENT)` 标注 —— 专用服务器永远不会加载它，因此"服务端不能
+引用客户端类"这条约束由类加载器本身保证，而不是靠开发者的自觉。验证方式是直接启动专用服务器：
+日志里没有任何 `NoClassDefFoundError`，且客户端与服务端可以互相连接。

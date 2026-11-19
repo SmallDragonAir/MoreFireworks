@@ -1,5 +1,6 @@
 package com.morefireworks.logic;
 
+import com.mojang.logging.LogUtils;
 import com.morefireworks.MFConfig;
 import com.morefireworks.core.FireworkLimits;
 import com.morefireworks.core.RocketSpec;
@@ -22,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.slf4j.Logger;
 
 /**
  * Turns a {@link RocketSpec} into an actual, visibly <em>sequential</em> firework.
@@ -45,6 +47,8 @@ import java.util.UUID;
  */
 public final class StagedDetonation {
 
+    private static final Logger LOGGER = LogUtils.getLogger();
+
     private static final Map<UUID, Timeline> ACTIVE = new HashMap<>();
 
     private StagedDetonation() {
@@ -57,6 +61,8 @@ public final class StagedDetonation {
         final Vec3 lastPosition;
         int delay;
         int age;
+        int fired;
+        final int total;
 
         Timeline(ServerLevel level, Entity rocket, Deque<FireworkExplosion> pending, Vec3 position) {
             this.level = level;
@@ -64,6 +70,7 @@ public final class StagedDetonation {
             this.pending = pending;
             this.lastPosition = position;
             this.delay = MFConfig.STAGE_INTERVAL_TICKS.get();
+            this.total = pending.size();
         }
     }
 
@@ -104,6 +111,9 @@ public final class StagedDetonation {
             timeline.level.createFireworks(at.x, at.y, at.z, 0.0, 0.0, 0.0, List.of(next));
             timeline.level.playSound(null, at.x, at.y, at.z, SoundEvents.FIREWORK_ROCKET_BLAST,
                     SoundSource.AMBIENT, 3.0F, 1.0F);
+            timeline.fired++;
+            LOGGER.debug("morefireworks: staged detonation {} fired stage {}/{} at ({}, {}, {})",
+                    entry.getKey(), timeline.fired, timeline.total, at.x, at.y, at.z);
             timeline.delay = MFConfig.STAGE_INTERVAL_TICKS.get();
             if (timeline.pending.isEmpty()) {
                 finished.add(entry.getKey());

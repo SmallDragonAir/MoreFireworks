@@ -9,12 +9,14 @@ import com.morefireworks.item.SpecFireworkRocketItem;
 import com.morefireworks.logic.VanillaBridge;
 import com.morefireworks.registry.MFCreativeTabs;
 import com.morefireworks.registry.MFDataComponents;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.FireworkExplosion;
 import net.minecraft.world.item.component.Fireworks;
+import net.minecraft.world.item.crafting.CraftingBookCategory;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.CustomRecipe;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -47,13 +49,24 @@ public class StarAssemblyRecipe extends CustomRecipe {
             StarAssemblyRecipe::new
     );
 
+    /**
+     * In 1.21.1 {@link RecipeSerializer} is an interface rather than an instantiable class, so the
+     * pair of codecs is wrapped in a tiny record. Record accessors {@code codec()} and
+     * {@code streamCodec()} satisfy the interface directly.
+     */
+    public record Serializer(MapCodec<StarAssemblyRecipe> codec,
+                             StreamCodec<RegistryFriendlyByteBuf, StarAssemblyRecipe> streamCodec)
+            implements RecipeSerializer<StarAssemblyRecipe> {
+    }
+
     public static final RecipeSerializer<StarAssemblyRecipe> SERIALIZER =
-            new RecipeSerializer<>(MAP_CODEC, STREAM_CODEC);
+            new Serializer(MAP_CODEC, STREAM_CODEC);
 
     private final Ingredient shell;
     private final Ingredient star;
 
     public StarAssemblyRecipe(Ingredient shell, Ingredient star) {
+        super(CraftingBookCategory.MISC);
         this.shell = shell;
         this.star = star;
     }
@@ -102,7 +115,7 @@ public class StarAssemblyRecipe extends CustomRecipe {
     }
 
     @Override
-    public ItemStack assemble(CraftingInput input) {
+    public ItemStack assemble(CraftingInput input, HolderLookup.Provider registries) {
         RocketSpec base = null;
         List<StarSpec> added = new ArrayList<>();
         for (int slot = 0; slot < input.size(); slot++) {
@@ -124,6 +137,15 @@ public class StarAssemblyRecipe extends CustomRecipe {
         }
         RocketSpec merged = merge(base, added);
         return merged.isEmpty() ? ItemStack.EMPTY : MFCreativeTabs.rocket(merged);
+    }
+
+    /**
+     * A 3×3 table is not required: the recipe works in the 2×2 inventory grid as well, which is
+     * where most players will try it.
+     */
+    @Override
+    public boolean canCraftInDimensions(int width, int height) {
+        return width * height >= 2;
     }
 
     /**

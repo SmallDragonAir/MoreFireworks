@@ -8,9 +8,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
-import net.minecraft.world.item.component.TooltipDisplay;
 
-import java.util.function.Consumer;
+import java.util.List;
 
 /**
  * A single firework star carrying a {@link StarSpec}: shape, ordered RGB colours, fade colours and
@@ -33,15 +32,13 @@ public class SpecFireworkStarItem extends Item {
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, TooltipContext context, TooltipDisplay display,
-                                Consumer<Component> tooltip, TooltipFlag flag) {
-        super.appendHoverText(stack, context, display, tooltip, flag);
+    public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip,
+                                TooltipFlag flag) {
+        super.appendHoverText(stack, context, tooltip, flag);
         StarSpec star = stack.get(MFDataComponents.STAR_SPEC.get());
         if (star == null) {
             return;
         }
-        for (Component line : NameComponents.starLines(star)) {
-            tooltip.accept(line);
-        }
+        tooltip.addAll(NameComponents.starLines(star));
     }
 }

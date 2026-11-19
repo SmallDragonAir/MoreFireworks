@@ -44,7 +44,7 @@ public final class MFCommands {
                 .then(Commands.literal("count")
                         .executes(MFCommands::count))
                 .then(Commands.literal("random")
-                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))
                         .executes(context -> giveRandom(context, "random", new Random().nextLong()))
                         .then(Commands.literal("complex")
                                 .executes(context -> giveRandom(context, "complex", new Random().nextLong())))
@@ -60,10 +60,10 @@ public final class MFCommands {
                 .then(Commands.literal("status")
                         .executes(MFCommands::status))
                 .then(Commands.literal("recipecheck")
-                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))
                         .executes(MFCommands::recipeCheck))
                 .then(Commands.literal("testlaunch")
-                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))
                         .executes(context -> testLaunch(context, "complex", 20260101L))
                         .then(Commands.literal("complex")
                                 .executes(context -> testLaunch(context, "complex", 20260101L)))
@@ -72,7 +72,7 @@ public final class MFCommands {
                         .then(Commands.literal("random")
                                 .executes(context -> testLaunch(context, "random", 20260101L))))
                 .then(Commands.literal("star")
-                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))
                         .then(Commands.argument("colour", StringArgumentType.word())
                                 .executes(context -> giveStar(context, StarShape.SMALL_BALL))
                                 .then(Commands.argument("shape", StringArgumentType.word())
@@ -249,7 +249,7 @@ public final class MFCommands {
             source.sendFailure(Component.translatable("morefireworks.command.recipecheck.miss"));
             return 0;
         }
-        ItemStack result = found.get().value().assemble(input);
+        ItemStack result = found.get().value().assemble(input, level.registryAccess());
         RocketSpec spec = result.get(MFDataComponents.ROCKET_SPEC.get());
         if (spec == null) {
             source.sendFailure(Component.translatable("morefireworks.command.recipecheck.miss"));
@@ -259,6 +259,8 @@ public final class MFCommands {
                 Component.literal(found.get().id().toString()).withStyle(ChatFormatting.GRAY),
                 Component.literal(Integer.toString(spec.starCount())).withStyle(ChatFormatting.AQUA),
                 Component.literal(SpecCodec.encode(spec)).withStyle(ChatFormatting.DARK_GRAY)), false);
+        source.sendSuccess(() -> Component.literal(
+                result.getHoverName().getString()).withStyle(ChatFormatting.AQUA), false);
         source.sendSuccess(() -> Component.literal(
                 FireworkNamer.name(spec, NamingLanguage.EN_US, NameMode.FULL)).withStyle(ChatFormatting.GOLD), false);
         source.sendSuccess(() -> Component.literal(

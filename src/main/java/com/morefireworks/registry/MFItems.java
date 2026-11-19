@@ -7,8 +7,6 @@ import net.minecraft.world.item.Item;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
-import java.util.function.UnaryOperator;
-
 /**
  * The mod's two items.
  *
@@ -22,11 +20,10 @@ public final class MFItems {
 
     public static final DeferredItem<SpecFireworkRocketItem> SPEC_ROCKET =
             ITEMS.registerItem("spec_firework_rocket", SpecFireworkRocketItem::new,
-                    properties -> properties.stacksTo(16));
+                    new Item.Properties().stacksTo(16));
 
     public static final DeferredItem<SpecFireworkStarItem> SPEC_STAR =
-            ITEMS.registerItem("spec_firework_star", SpecFireworkStarItem::new,
-                    UnaryOperator.identity());
+            ITEMS.registerItem("spec_firework_star", SpecFireworkStarItem::new);
 
     private MFItems() {
     }

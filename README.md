@@ -19,40 +19,55 @@ memory use does not grow with the number of variants — because the number of v
 Every one of those variants is reachable through a deterministic algorithm, and every one of them
 is stored in the same two data components.
 
+> **Branches.** `main` is the Minecraft **26.2** / NeoForge 26.2.0.58 build. This branch,
+> `mc1.21.1`, is the *same* mod ported to Minecraft **1.21.1** / NeoForge **21.1.x** (developed
+> against 21.1.244 and intended to run on any 21.1.x server). Both branches are complete, built and
+> verified; building here produces `morefireworks-1.0.0+mc1.21.1.jar` and never touches the 26.2
+> artifacts. The port kept the combinatorics, the randomiser, the 819-digit total and the naming
+> algorithm byte-for-byte — only the Minecraft/NeoForge API calls differ, and every difference is
+> listed in [§8](#8-what-changed-in-the-1211-port).
+
 ---
 
 ## 1. Requirements
 
 | Component | Version |
 | --- | --- |
-| Minecraft | **26.2** |
-| NeoForge | **26.2.0.58** |
-| Java (toolchain) | **25** (`javaVersion.majorVersion` of the 26.2 manifest is 25) |
-| Gradle | 9.x (the bundled wrapper targets 9.2.1; any 9.x works) |
+| Minecraft | **1.21.1** |
+| NeoForge | **21.1.244** to develop; the jar declares `versionRange = "[21.1.0,)"` so any 21.1.x server accepts it |
+| Java (toolchain) | **21** |
+| Gradle | 9.x (the bundled wrapper targets 9.9.1; any 9.x works) |
 | NeoForge ModDev plugin | `net.neoforged.moddev` 2.0.148 |
 
 The version triple was verified against the official metadata before any code was written:
 
-* `https://piston-meta.mojang.com/.../26.2.json` reports `javaVersion.majorVersion = 25`,
-  `id = 26.2`, `type = release`.
-* `net.neoforged:neoforge:26.2.0.58` exists in the NeoForged Maven (`installer`, `userdev`,
-  `universal` artifacts), and its `version.json` declares `inheritsFrom: 26.2` and
-  `mainClass: net.neoforged.fml.startup.Client`.
+* `https://piston-meta.mojang.com/.../1.21.1.json` reports `id = 1.21.1`, `type = release`, and a
+  Java 21 runtime component.
+* `net.neoforged:neoforge:21.1.244` exists on the NeoForged Maven (`installer`, `userdev`,
+  `universal` artifacts) and depends on `net.neoforged:neoform:1.21.1-20240808.144430`.
 
 ## 2. Building
 
 ```bash
-./gradlew build          # compiles, runs the unit tests, produces build/libs/morefireworks-1.0.0.jar
+./gradlew build          # compiles, runs the unit tests, produces build/libs/morefireworks-1.0.0+mc1.21.1.jar
 ./gradlew test           # unit tests only
-./gradlew runClient      # dev client
-./gradlew runServer      # dev server
+./gradlew runClient      # dev client (game dir: run-client/)
+./gradlew runClientJoin  # dev client that joins 127.0.0.1:25565 straight away
+./gradlew runServer      # dev server (game dir: run/)
 ```
 
 The wrapper is generated but its distribution cannot be fetched on every network; on this
 development machine the builds above were run with a local Gradle **9.9.1** binary instead
 (`gradle build`), which is why the exact command that was executed is recorded in
-[§7](#7-tests). Java 25 must be reachable as a toolchain; the `java` block pins it and Gradle
+[§7](#7-tests). Java 21 must be reachable as a toolchain; the `java` block pins it and Gradle
 downloads it if needed.
+
+The dev client and the dev server use **different game directories** (`run-client/` and `run/`)
+exactly so they can run at the same time: sharing one directory makes both processes fight over
+`logs/latest.log` and `options.txt`, which breaks the client/server compatibility check. The
+`runClientJoin` configuration additionally passes `--quickPlayMultiplayer 127.0.0.1:25565`, so the
+dev client connects to the dev server without any GUI interaction; that is how the connection row
+in [§7](#7-tests) was produced.
 
 ### Building without `maven.neoforged.net`
 
@@ -76,11 +91,12 @@ Two more adjustments are needed on such a network, and both are in the repositor
 
 * `mavenCentral()` is replaced by `https://repo1.maven.org/maven2`, because Gradle's default
   `repo.maven.apache.org` host can be poisoned in the same way;
-* `net.neoforged:minecraft-dependencies:26.2` — a *generated* POM that merely lists Mojang's
+* `net.neoforged:minecraft-dependencies:1.21.1` — a *generated* POM that merely lists Mojang's
   libraries — is missing from the CDN mirror. `local-maven/` therefore contains a stand-in POM with
-  the same coordinates, rebuilt from Mojang's published 26.2 manifest by
+  the same coordinates, rebuilt from Mojang's published 1.21.1 manifest by
   [`tools/gen-mcdeps.js`](tools/gen-mcdeps.js) (`node tools/gen-mcdeps.js`, or `--check` to see
-  whether it is still current). It is checked in because it is derived data, not a secret.
+  whether it is still current; `MC_VERSION=1.21.1` selects the version, the default is `26.2` for
+  the other branch). It is checked in because it is derived data, not a secret.
 
 ## 3. What the player gets
 
@@ -97,12 +113,12 @@ Two more adjustments are needed on such a network, and both are in the repositor
 │   ├── core/       StarSpec, RocketSpec, SpecCodec, RocketAssembly, combinatorics, randomiser
 │   ├── naming/     nomenclature engine, vocabulary, component renderer, LRU cache
 │   ├── logic/      VanillaBridge, StagedDetonation
-│   ├── recipe/     StarAssemblyRecipe
+│   ├── recipe/     StarAssemblyRecipe (+ its 1.21.1 serializer record)
 │   ├── registry/   data components, items, recipe serializer, creative tab
 │   ├── command/    /morefireworks
+│   ├── client/     MFClientSetup — client-only star tint (Dist.CLIENT, never loaded server-side)
 │   └── MFConfig    configurable runtime limits (COMMON config)
-├── src/main/resources/                            assets (lang, models, item definitions)
-│                                                 and data (recipe, item tags)
+├── src/main/resources/                            assets (lang, models) and data (recipe, item tags)
 ├── src/main/templates/META-INF/neoforge.mods.toml  expanded at build time
 └── src/test/java/                                 47 unit tests
 ```
@@ -283,29 +299,50 @@ and logs use the plain-text form produced by `FireworkNamer`.
 | Step | Command | Result |
 | --- | --- | --- |
 | Compile | `gradle compileJava` | `BUILD SUCCESSFUL` |
-| Test | `gradle test` | 47 tests, 0 failures |
-| Package | `gradle build` | `build/libs/morefireworks-1.0.0.jar` (85,556 bytes, 71 entries) |
-| Dedicated server | `gradle runServer` | `More Fireworks 1.0.0 (morefireworks)` loaded, `Done (0.219s)!` |
-| Client | `gradle runClient` | mod loaded, resource reload included `mod/morefireworks`, `Sound engine started`, no missing-model warnings |
-| Combinatorics | RCON `morefireworks count` | `Total item variants: 1887290165…5569923`, 819 digits, `1.8873e+818` |
-| Recipe | RCON `morefireworks recipecheck` | matched `morefireworks:star_assembly`, produced 2 ordered stages |
-| Staged detonation | RCON `morefireworks testlaunch extreme` then `morefireworks status` | `7 stages`, 1 timeline active, drains back to 0 with no exception in the log |
-| Persistence | RCON `summon` an item carrying `morefireworks:rocket_spec`, `save-all`, `stop`, restart, `data get entity` | component came back unchanged: `"morefireworks:rocket_spec": "v1;3;star:b02e26:3c44aa:ft\|large_ball:3c44aa::t"` |
+| Test | `gradle test` | 47 tests, 0 failures, 0 errors |
+| Package | `gradle build` | `build/libs/morefireworks-1.0.0+mc1.21.1.jar` (88,251 bytes, 71 entries) |
+| Dedicated server | `gradle runServer` | `More Fireworks 1.0.0+mc1.21.1 (morefireworks)` loaded, `Done (0.825s)!` |
+| Client | `gradle runClient` | `LWJGL version 3.3.3+5`, resource reload included `mod/morefireworks`, `Sound engine started`, no missing-model warnings |
+| Client ↔ server | `gradle runClientJoin` against the running dev server | client: `Connecting to 127.0.0.1, 25565`; server: `Dev[/127.0.0.1:52279] logged in with entity id 27` and `Dev joined the game` |
+| Combinatorics | RCON `morefireworks count` | `Total item variants: 1887290165…535569923`, 819 digits, `1.8873e+818` |
+| Recipe | RCON `morefireworks recipecheck` | matched `morefireworks:star_assembly`, produced 2 ordered stages, item name rendered as `Tier I-1 flicker-1 trail-red/blue/yellow gradient-star-large ball compound firework rocket` |
+| Staged detonation | RCON `morefireworks testlaunch extreme`, then `morefireworks status` | `7 stages`, 1 timeline active, drains back to 0; the log shows `fired stage 1/6 … 6/6` in ascending order, so the bursts really are sequential |
+| Persistence | RCON `summon` an item carrying `morefireworks:rocket_spec`, `save-all`, `stop`, cold start, `data get entity` | component came back unchanged: `"morefireworks:rocket_spec": "v1;3;star:b02e26:3c44aa:ft\|large_ball:3c44aa::t"` |
+| Config | server start | `run/config/morefireworks-common.toml` written with the three documented options |
+| Client chat | RCON `give Dev morefireworks:spec_firework_rocket[…]` | the client printed the dynamic name in chat: `[Tier III-1 flicker-2 trail-red/blue gradient-star-large ball compound firework rocket]` |
 
-All Gradle invocations in this table used the local Gradle 9.9.1 binary with the JDK 25 install
-(`JAVA_HOME` pointing at a Temurin/Zulu 25). `./gradlew` runs exactly the same tasks wherever the
-wrapper distribution can be downloaded (see §2). The server used for these checks lives in `run/`
-(git-ignored) and was driven over RCON, so the evidence above is from a real 26.2 server process
-rather than from reading the code. The
-persistence check went through a full save → shutdown → cold start cycle; the item's dynamic name
-(`Tier III-1 flicker-2 trail-red/blue gradient-star-large ball compound firework rocket`) was
-regenerated from the reloaded component, not stored anywhere.
+All Gradle invocations in this table used the local Gradle 9.9.1 binary with **JDK 21**
+(`JAVA_HOME` pointing at a JDK 21 install). `./gradlew` runs exactly the same tasks wherever the
+wrapper distribution can be downloaded (see §2). The server used for these checks lives in `run/`,
+the client in `run-client/` (both git-ignored), and everything was driven over RCON or by reading
+the two log files, so the evidence above comes from real 1.21.1 processes rather than from reading
+the code.
 
-Config values were verified the same way: the server wrote `run/config/morefireworks-common.toml`
-with the three documented options, and a `complex` launch still drained its timeline in ~11 s with
-the default 6-tick interval.
+The persistence check went through a full save → shutdown → cold start cycle; the item's dynamic
+name (`Tier III-1 flicker-2 trail-red/blue gradient-star-large ball compound firework rocket`) was
+regenerated from the reloaded component, not stored anywhere. The only error in the client log was
+`Failed to request yggdrasil public key` — expected for an offline dev client and unrelated to the
+mod.
 
-## 8. What this first version does not do
+## 8. What changed in the 1.21.1 port
+
+The parameter system, the codec, the combinatorics, the naming engine, the randomiser and the
+staged-detonation design are identical to the 26.2 branch: those classes touch no Minecraft API
+beyond `Component` construction. Everything that *did* change is an API call:
+
+| Area | 26.2 | 1.21.1 |
+| --- | --- | --- |
+| Tooltips | `appendHoverText(ItemStack, TooltipContext, TooltipDisplay, Consumer<Component>, TooltipFlag)` | `appendHoverText(ItemStack, Item.TooltipContext, List<Component>, TooltipFlag)` — `TooltipDisplay` does not exist yet, so lines are appended to the list directly |
+| Primary use | `use(...)` returns `InteractionResult` | returns `InteractionResultHolder<ItemStack>` |
+| Permissions | `Commands.hasPermission(Commands.LEVEL_GAMEMASTERS)` helper | no helper in 1.21.1: `.requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))` |
+| Recipe serializer | `RecipeSerializer` was an instantiable record-like class | `RecipeSerializer` is an **interface**, so `StarAssemblyRecipe.Serializer` is a small record exposing `codec()`/`streamCodec()` |
+| Recipe plumbing | `assemble(CraftingInput)`, no `canCraftInDimensions` | `assemble(CraftingInput, HolderLookup.Provider)` plus `canCraftInDimensions(int, int)`; `CustomRecipe` also requires a `CraftingBookCategory` |
+| Ingredient JSON | `Ingredient.CODEC` is a `HolderSet` codec (`"#tag"` strings) | `Ingredient.CODEC` is the classic JSON object, so the recipe uses `{"tag": "morefireworks:rocket_shells"}` |
+| Item registration | `registerItem(name, factory, UnaryOperator<Item.Properties>)` | no `UnaryOperator` overload: `registerItem(name, factory, new Item.Properties()…)` |
+| Item tints | `assets/<ns>/items/*.json` item model definitions carry the tints | that system does not exist in 1.21.1, so `client/MFClientSetup` registers an `ItemColor` through `RegisterColorHandlersEvent.Item`, gated with `value = Dist.CLIENT` so a dedicated server never loads it |
+| Test dependency | `com.mojang:datafixerupper:10.0.21` | removed — 1.21.1 ships DFU 8.0.16 and no unit test needs it |
+
+## 9. What this first version does not do
 
 * **No GUI editor.** Stars and rockets are obtained from the creative tab, the assembly recipe or
   the commands. `RocketSpec`/`StarSpec` are plain records, so an editor only has to build one and
@@ -318,13 +355,13 @@ the default 6-tick interval.
 * **Sequential bursts are ~6 ticks apart** by default (configurable), so a 5-star rocket is a bit
   longer than a vanilla one. That delay is the price of making the order actually visible.
 
-## 9. Documentation
+## 10. Documentation
 
 * [`docs/COMBINATORICS.md`](docs/COMBINATORICS.md) — the full derivation, exact values and the
   distinction between *mathematical*, *generatable* and *visually distinct* variants.
 * [`docs/NAMING.md`](docs/NAMING.md) — the nomenclature rules, with worked examples.
 * [`docs/DESIGN.md`](docs/DESIGN.md) — architecture decisions and the vanilla-reuse trade-offs.
 
-## 10. Licence
+## 11. Licence
 
 MIT. See `LICENSE`.

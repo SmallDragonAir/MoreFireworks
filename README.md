@@ -361,6 +361,7 @@ beyond `Component` construction. Everything that *did* change is an API call:
   distinction between *mathematical*, *generatable* and *visually distinct* variants.
 * [`docs/NAMING.md`](docs/NAMING.md) — the nomenclature rules, with worked examples.
 * [`docs/DESIGN.md`](docs/DESIGN.md) — architecture decisions and the vanilla-reuse trade-offs.
+* [`README.zh-CN.md`](README.zh-CN.md) — the full Chinese edition of this document (完整中文版说明).
 
 ## 11. Licence
 

@@ -1,0 +1,29 @@
+# Gradle / build output
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# ModDevGradle run directory (dev server and client worlds, logs, configs)
+run/
+
+# IDE files
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+bin/
+out/
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Local scratch work (not part of the deliverable)
+.scratch/
+
+# Note: local-maven/ IS tracked on purpose. It contains a generated POM that the public
+# NeoForged mirrors are missing; see README "Building without maven.neoforged.net".

@@ -1,0 +1,156 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.148'
+}
+
+version = mod_version
+group = mod_group_id
+
+base {
+    archivesName = mod_id
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(project.java_version as int)
+    withSourcesJar()
+}
+
+repositories {
+    // A tiny local Maven repository used to supply artifacts that the public mirrors we can
+    // reach do not carry (currently net.neoforged:minecraft-dependencies:26.2, which is
+    // regenerated from Mojang's own version manifest by .scratch/gen-mcdeps.js). It is only
+    // added when the directory exists, so a normal checkout of this project is unaffected.
+    if (file('local-maven').isDirectory()) {
+        maven {
+            name = 'Local mirror supplement (generated POMs)'
+            url = uri('local-maven')
+        }
+    }
+    // Minecraft's own libraries (DataFixerUpper, authlib, brigadier, ...).
+    maven {
+        name = 'Mojang libraries'
+        url = 'https://libraries.minecraft.net'
+    }
+    // Official NeoForged CDN mirror of https://maven.neoforged.net/releases.
+    // The upstream host is blocked by SNI filtering on some networks, so it is
+    // listed first; the URL layout is simply <mirror>/releases/<maven path>.
+    maven {
+        name = 'NeoForged CDN'
+        url = 'https://neoforged.forgecdn.net/releases'
+    }
+    // Secondary mirror: proxies most NeoForged artifacts, but not neoform-runtime.
+    maven {
+        name = 'NeoForged mirror (BMCLAPI)'
+        url = 'https://bmclapi2.bangbang93.com/maven'
+    }
+    // mavenCentral() points at repo.maven.apache.org, which some networks cannot resolve.
+    // repo1.maven.org serves the same content and is reachable there.
+    maven {
+        name = 'Maven Central (repo1)'
+        url = 'https://repo1.maven.org/maven2'
+    }
+    mavenCentral()
+}
+
+// The moddev plugin registers https://maven.neoforged.net/releases itself, before this
+// build script's own repositories block runs, so that host would always be consulted first.
+// On networks where the NeoForged CDN is unreachable (SNI filtering / poisoned DNS) that turns
+// every dependency resolution into a hard timeout. Rewrite any such repository to the official
+// CDN mirror as soon as it appears, keeping the plugin's intended ordering intact.
+repositories.withType(MavenArtifactRepository).configureEach { repo ->
+    if (repo.url.toString().contains('maven.neoforged.net')) {
+        repo.url = uri('https://neoforged.forgecdn.net/releases')
+    }
+}
+
+neoForge {
+    version = project.neo_version
+
+    runs {
+        client {
+            client()
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+        server {
+            server()
+            programArgument '--nogui'
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+        gameTestServer {
+            type = 'gameTestServer'
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+        data {
+            clientData()
+            programArguments.addAll '--mod', project.mod_id, '--all',
+                    '--output', file('src/generated/resources/').getAbsolutePath(),
+                    '--existing', file('src/main/resources/').getAbsolutePath()
+        }
+        configureEach {
+            logLevel = org.slf4j.event.Level.DEBUG
+        }
+    }
+
+    mods {
+        "${project.mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+    }
+}
+
+dependencies {
+    // Unit tests deliberately run on a plain JUnit 5 stack: all combinatorial, naming and
+    // serialization logic lives in plain Java classes that do not require a Minecraft runtime.
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    // Only needed by the codec tests, which exercise the real DFU codecs.
+    testImplementation 'com.mojang:datafixerupper:10.0.21'
+}
+
+// Expands the mod metadata template with the properties from gradle.properties.
+var generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {
+    var replaceProperties = [
+            minecraft_version      : minecraft_version,
+            minecraft_version_range: minecraft_version_range,
+            neo_version            : neo_version,
+            mod_id                 : mod_id,
+            mod_name               : mod_name,
+            mod_license            : mod_license,
+            mod_version            : mod_version,
+            mod_authors            : mod_authors,
+            mod_description        : mod_description,
+    ]
+    inputs.properties replaceProperties
+    expand replaceProperties
+    from 'src/main/templates'
+    into 'build/generated/sources/modMetadata'
+}
+
+sourceSets.main.resources.srcDir generateModMetadata
+neoForge.ideSyncTask generateModMetadata
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs << '-Xlint:deprecation' << '-Xlint:unchecked'
+}
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+        showStandardStreams = false
+    }
+}
+
+jar {
+    manifest {
+        attributes([
+                'Specification-Title'     : mod_id,
+                'Specification-Vendor'    : mod_authors,
+                'Specification-Version'   : '1',
+                'Implementation-Title'    : mod_name,
+                'Implementation-Version'  : mod_version,
+                'Implementation-Vendor'   : mod_authors,
+        ])
+    }
+}
